@@ -53,7 +53,7 @@ app.use((err, req, res, next) => {
 })();
 
 (() => {
-  //   downloadAndExtractZip();
+  downloadAndExtractZip();
 })();
 
 // Start Server
