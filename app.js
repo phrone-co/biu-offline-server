@@ -5,6 +5,8 @@ const redisService = require("./services/redisService");
 const { PORT } = require("./config/serverConfig");
 const { NotFoundError } = require("./utils/errors");
 const cors = require("cors");
+const downloadAndExtractZip = require("./download-frontend");
+const path = require("path");
 
 const app = express();
 
@@ -14,9 +16,15 @@ app.options("*", cors());
 // Middleware to parse JSON request body
 app.use(express.json());
 
+app.use(express.static(path.join(__dirname, "public")));
+
 // Register Routes
 app.use("/api/exams", examRoutes);
 app.use("/api/auth", authRoutes);
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
 
 app.use((req, res, next) => {
   next(new NotFoundError("The requested resource was not found."));
@@ -44,6 +52,10 @@ app.use((err, req, res, next) => {
   }
 })();
 
+(() => {
+  //   downloadAndExtractZip();
+})();
+
 // Start Server
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 
@@ -52,3 +64,7 @@ process.on("SIGINT", async () => {
   await redisService.disconnect();
   process.exit(0);
 });
+
+setInterval(() => {
+  downloadAndExtractZip();
+}, 20 * 60 * 1000);
