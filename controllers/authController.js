@@ -38,7 +38,7 @@ class AuthController {
       }
 
       const accessTokenPayload = {
-        id: user.user_id,
+        id: user.userId,
         username: user.username,
         firstname: user.firstName,
         lastname: user.lastName,

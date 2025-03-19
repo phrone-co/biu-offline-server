@@ -71,6 +71,15 @@ class OnlineExamService {
       return null;
     }
   }
+
+  async startStudentExam(userId, examId) {
+    const response = await this.sendPostRequest(
+      { id: userId },
+      `api/exams/${examId}/start`
+    );
+
+    return response;
+  }
 }
 
 module.exports = new OnlineExamService();

@@ -8,10 +8,16 @@ const router = express.Router();
 router.get("/exam/state/:studentId", ExamController.fetchExamState);
 router.get("/", authMiddleware, ExamController.fetchStudentExams);
 router.post("/:examId/start", authMiddleware, ExamController.startStudentExam);
+router.post("/:examId/terminate", authMiddleware, ExamController.finishedExam);
 router.post(
   "/:examId/questions/:questionId/mark-as-seen",
   authMiddleware,
   ExamController.markAsSeen
+);
+router.post(
+  "/:examId/questions/:questionId/answer",
+  authMiddleware,
+  ExamController.answerQuestion
 );
 
 router.get("/all", ExamController.fetchAllAvailableExams);

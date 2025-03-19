@@ -1,6 +1,7 @@
 const onlineExamServices = require("../services/onlineExamServices");
 const redisService = require("../services/redisService");
 const httpRequest = require("../utils/httpRequest");
+const { DateTime } = require("luxon");
 
 class ExamController {
   static async fetchExamState(req, res) {
@@ -42,7 +43,7 @@ class ExamController {
 
         studentsExams[student.userId].exams.push(studentExams);
 
-        console.log(studentExams);
+        console.log("studentExams:::: ", studentExams);
       }
     }
 
@@ -52,13 +53,33 @@ class ExamController {
       const { exams, student } = studentsExams[studentId];
       console.log(exams);
 
-      await Promise.all([
-        redisService.addStudent(student.userId, {
-          studentExams: exams,
-          student,
-        }),
-        redisService.addStudentLogin(student.username, student),
-      ]);
+      for (let exam of exams) {
+        await Promise.all([
+          redisService.addStudent(student.userId, {
+            studentExams: exams,
+            student,
+          }),
+          redisService.addStudentLogin(student.username, student),
+        ]);
+        try {
+          const examQuestions = await onlineExamServices.startStudentExam(
+            studentId,
+            exam.test_id
+          );
+
+          await redisService.addStudentExamAttempt(
+            studentId,
+            exam.test_id,
+            examQuestions
+          );
+        } catch (error) {
+          console.log(
+            "could not load exam questions for student: ",
+            exam,
+            studentId
+          );
+        }
+      }
     }
 
     res.status(201);
@@ -88,33 +109,43 @@ class ExamController {
     const examId = req.params.examId;
     const studentId = req.session.id;
 
-    try {
-      const response = await httpRequest(
-        `api/exams/${examId}/start`,
-        "POST",
-        {},
-        req.headers
+    const examQuestions = await redisService.fetchStudentExamAttempt(
+      studentId,
+      examId
+    );
+
+    if (examQuestions && !examQuestions.isStarted) {
+      const startDate = new Date();
+
+      await redisService.enqueue("request", {
+        uri: `api/exams/${examId}/set-start-date`,
+        method: "POST",
+        headers: req.headers,
+        body: {
+          startDate,
+        },
+      });
+
+      const testEndTime = DateTime.fromJSDate(examQuestions.testStartTime).plus(
+        {
+          seconds: examQuestions.testDurationInSeconds,
+        }
       );
 
-      const examQuestions = await response.json();
+      examQuestions.isStarted = true;
+      examQuestions.endTime = testEndTime;
 
       await redisService.addStudentExamAttempt(
         studentId,
         examId,
         examQuestions
       );
-
-      res.status(response.status);
-      res.json(examQuestions);
-    } catch (error) {
-      const examQuestions = await redisService.fetchStudentExamAttempt(
-        studentId,
-        examId
-      );
-
-      res.status(200);
-      res.json(examQuestions);
     }
+
+    console.log("examQuestions::: ", studentId, examId, examQuestions);
+
+    res.status(200);
+    res.json(examQuestions);
   }
 
   static async markAsSeen(req, res) {
@@ -142,6 +173,68 @@ class ExamController {
     };
 
     await redisService.addStudentExamAttempt(studentId, examId, examQuestions);
+
+    res.status(200);
+    res.json({});
+  }
+
+  static async answerQuestion(req, res) {
+    const examId = req.params.examId;
+    const questionId = req.params.questionId;
+    const studentId = req.session.id;
+    const optionId = req.body.optionId;
+    const answerPosition = req.body.answerPosition;
+
+    await redisService.enqueue("request", {
+      uri: `api/exams/${examId}/questions/${questionId}/answer`,
+      method: "POST",
+      headers: req.headers,
+      body: req.body,
+    });
+
+    const examQuestions = await redisService.fetchStudentExamAttempt(
+      studentId,
+      examId
+    );
+    const questionIndex = examQuestions.questions.findIndex(
+      (question) => question.id == questionId
+    );
+    const question = examQuestions.questions[questionIndex];
+    const options = question.options.map((option) => {
+      if (option.id === optionId) {
+        option.selected = answerPosition[option.order];
+      }
+
+      return option;
+    });
+
+    question.options = options;
+
+    examQuestions.questions[questionIndex] = {
+      ...question,
+    };
+
+    await redisService.addStudentExamAttempt(studentId, examId, examQuestions);
+
+    res.status(200);
+    res.json({});
+  }
+
+  static async finishedExam(req, res) {
+    const examId = req.params.examId;
+    const studentId = req.session.id;
+
+    await redisService.enqueue("request", {
+      uri: `api/exams/${examId}/terminate`,
+      method: "POST",
+      headers: req.headers,
+    });
+
+    const exam = await redisService.fetchStudentExamAttempt(studentId, examId);
+
+    exam.isFinished = true;
+
+    await redisService.addStudentExamAttempt(studentId, examId, exam);
 
     res.status(200);
     res.json({});

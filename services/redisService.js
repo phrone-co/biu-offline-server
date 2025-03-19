@@ -7,7 +7,6 @@ let redisClient;
 
 class RedisService {
   constructor() {
-    console.log("constructorsss::: ", REDIS_PASSWORD);
     redisClient = redis.createClient({
       socket: {
         host: REDIS_HOST,
