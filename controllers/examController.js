@@ -128,7 +128,7 @@ class ExamController {
 
       const testEndTime = DateTime.fromJSDate(examQuestions.testStartTime).plus(
         {
-          seconds: examQuestions.testDurationInSeconds,
+          seconds: examQuestions.testDurationInSeconds + 6,
         }
       );
 
