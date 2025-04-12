@@ -32,14 +32,8 @@ class RedisService {
     }
   }
 
-  async enqueue(queueName, request) {
+  async enqueue(queueName, requestData) {
     try {
-      const requestData = {
-        method: request.method,
-        url: request.url,
-        headers: request.headers,
-        body: request.body || null,
-      };
       await redisClient.rPush(queueName, JSON.stringify(requestData));
       console.log(`Enqueued request in ${queueName}`);
     } catch (error) {
@@ -50,6 +44,16 @@ class RedisService {
   async dequeue(queueName) {
     try {
       const item = await redisClient.lPop(queueName);
+      return item ? JSON.parse(item) : null;
+    } catch (error) {
+      console.error("Error dequeuing request:", error);
+      return null;
+    }
+  }
+
+  async peek(queueName) {
+    try {
+      const item = await redisClient.lIndex(queueName, 0);
       return item ? JSON.parse(item) : null;
     } catch (error) {
       console.error("Error dequeuing request:", error);
@@ -184,9 +188,14 @@ class RedisService {
         `students-exams`,
         `${studentId}-${examId}`
       );
-      return studentData ? JSON.parse(studentData) : null;
+
+      if (!studentData) {
+        return null;
+      }
+
+      return JSON.parse(studentData);
     } catch (error) {
-      console.error(`Error fetching student ${matricNumber}:`, error);
+      console.error(`Error fetching student ${studentId} ${examId}:`, error);
       return null;
     }
   }

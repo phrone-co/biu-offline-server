@@ -9,6 +9,7 @@ router.get("/exam/state/:studentId", ExamController.fetchExamState);
 router.get("/", authMiddleware, ExamController.fetchStudentExams);
 router.post("/:examId/start", authMiddleware, ExamController.startStudentExam);
 router.post("/:examId/terminate", authMiddleware, ExamController.finishedExam);
+router.post("/:examId/time-up", authMiddleware, ExamController.examTimeUp);
 router.post(
   "/:examId/questions/:questionId/mark-as-seen",
   authMiddleware,
@@ -20,6 +21,6 @@ router.post(
   ExamController.answerQuestion
 );
 
-router.get("/all", ExamController.fetchAllAvailableExams);
+// router.get("/all", ExamController.fetchAllAvailableExams);
 
 module.exports = router;

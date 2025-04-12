@@ -1,8 +1,10 @@
 const { ONLINE_EXAM_API_URL, JWT_SECRET } = require("../config/serverConfig");
 const jwt = require("jsonwebtoken");
+const redisService = require("./redisService");
 
 class OnlineExamService {
   constructor(apiUrl) {
+    console.log("ONLINE_EXAM_API_URL::: ", ONLINE_EXAM_API_URL);
     this.apiUrl = apiUrl || ONLINE_EXAM_API_URL;
   }
 
@@ -16,11 +18,19 @@ class OnlineExamService {
       body: JSON.stringify(body),
     });
 
-    if (!response.ok) {
-      throw new Error(`Server responded with ${response.status}`);
+    console.log("response::: ", response);
+
+    // if (!response.ok) {
+    //   throw new Error(`Server responded with ${response.status}`);
+    // }
+
+    const contentType = response.headers.get("content-type");
+
+    if (contentType && contentType.includes("application/json")) {
+      return await response.json();
     }
 
-    return await response.json();
+    return await response.text();
   }
 
   generateAuthToken(payload, expiresIn = 300) {
@@ -30,8 +40,6 @@ class OnlineExamService {
   async fetchExams() {
     try {
       const response = await this.sendPostRequest({}, "api/exams/all");
-
-      console.log("fetchExams::: ", response);
 
       return response;
     } catch (error) {
@@ -45,8 +53,6 @@ class OnlineExamService {
       const response = await this.sendPostRequest({}, "api/exams/students", {
         testId,
       });
-
-      console.log("fetchExams::: ", response);
 
       return response;
     } catch (error) {
@@ -79,6 +85,80 @@ class OnlineExamService {
     );
 
     return response;
+  }
+
+  async replayQueuedRequests(queueName) {
+    while (true) {
+      const request = await redisService.peek(queueName);
+
+      if (!request) {
+        // If queue is empty, wait 5 seconds before checking again
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        continue;
+      }
+
+      let attempts = 0;
+      while (attempts < 3) {
+        try {
+          delete request.headers.Authorization.exp;
+          delete request.headers.Authorization.iat;
+
+          const response = await this.sendPostRequest(
+            request.headers.Authorization,
+            request.uri,
+            request.body
+          );
+          console.log(
+            `✅ Successfully replayed request to ${request.uri}:`,
+            response
+          );
+          await redisService.dequeue(queueName);
+          break; // Exit retry loop on success
+        } catch (error) {
+          attempts++;
+          console.error(
+            `❌ Attempt ${attempts} failed for ${request.uri}:`,
+            error.message,
+            `${error}`,
+            error.trace
+          );
+
+          console.log(
+            "wiki::: ",
+            error,
+            error.cause,
+            error.cause?.message,
+            error.stack,
+            typeof error.stack
+          );
+
+          if (
+            error.message.includes("Network Error") ||
+            error.stack.includes("ECONNREFUSED") ||
+            error.cause?.message.includes("ECONNREFUSED")
+          ) {
+            console.warn(
+              "🌐 No internet connection detected. Retrying in 10s..."
+            );
+            await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 10 seconds
+            continue; // Do not increment attempts on network errors
+          }
+
+          // Exponential backoff: Wait (2^attempts) * 1000 ms before retrying
+          await new Promise((resolve) =>
+            setTimeout(resolve, Math.pow(2, attempts) * 100)
+          );
+
+          if (attempts === 3) {
+            console.error(
+              `🚨 Failed after 3 attempts, re-enqueuing request: ${request.uri}`
+            );
+            await redisService.dequeue(queueName);
+            await redisService.enqueue(`${queueName}-failed`, request);
+          }
+        }
+      }
+    }
   }
 }
 
