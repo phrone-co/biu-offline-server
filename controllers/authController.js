@@ -1,15 +1,22 @@
 const onlineExamServices = require("../services/onlineExamServices");
 const redisService = require("../services/redisService");
-const bcrypt = require("bcryptjs");
+const bcrypt = require("bcrypt");
 const { BadRequestError } = require("../utils/errors");
 const { userResponse } = require("../utils/userResponse");
-const { ONLINE_EXAM_API_URL, JWT_SECRET } = require("../config/serverConfig");
+const {
+  ONLINE_EXAM_API_URL,
+  JWT_SECRET,
+  SCHOOL_ID,
+} = require("../config/serverConfig");
 const jwt = require("jsonwebtoken");
 const httpRequest = require("../utils/httpRequest");
 
 class AuthController {
   static async loginUserViaApi(username, password) {
-    return httpRequest("api/auth/login", "POST", { username, password });
+    return httpRequest("api/v1/users/login", "POST", {
+      email: username,
+      password,
+    });
   }
 
   static async loginUser(req, res) {
@@ -17,9 +24,23 @@ class AuthController {
 
     try {
       const response = await AuthController.loginUserViaApi(username, password);
+      const jsonResponse = await response.json();
+
+      const accessTokenPayload = {
+        id: jsonResponse.user.id,
+        email: jsonResponse.user.email,
+        schoolId: SCHOOL_ID,
+      };
+
+      const accessToken = jwt.sign(accessTokenPayload, JWT_SECRET, {
+        expiresIn: "5h",
+      });
 
       res.status(response.status);
-      res.json(await response.json());
+      res.json({
+        user: jsonResponse.user,
+        accessToken,
+      });
     } catch (error) {
       console.log("Login Failed, trying local login", error);
       let user = await redisService.fetchStudentLogin(username);
@@ -28,28 +49,24 @@ class AuthController {
         throw new BadRequestError("Invalid Username!");
       }
 
-      const isPasswordValid = await bcrypt.compare(
-        password,
-        user.password.replace(/^\$2y(.+)$/i, "$2a$1")
-      );
+      const isPasswordValid = await bcrypt.compare(password, user.password);
 
       if (!isPasswordValid) {
         throw new BadRequestError("Your password is wrong!");
       }
 
       const accessTokenPayload = {
-        id: user.userId,
-        username: user.username,
-        firstname: user.firstName,
-        lastname: user.lastName,
+        id: user.id,
+        email: user.email,
+        schoolId: SCHOOL_ID,
       };
 
       const accessToken = jwt.sign(accessTokenPayload, JWT_SECRET, {
-        expiresIn: "4h",
+        expiresIn: "5h",
       });
 
       res.status(200);
-      res.json({ user: userResponse(user), accessToken });
+      res.json({ user: user, accessToken });
     }
   }
 }

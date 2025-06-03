@@ -14,6 +14,8 @@ const authMiddleware = async (req, res, next) => {
         header.length
       );
 
+      console.log(authorizationKey);
+
       try {
         const tokenData = jwt.verify(authorizationKey, JWT_SECRET);
 

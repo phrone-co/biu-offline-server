@@ -1,4 +1,10 @@
-const { ONLINE_EXAM_API_URL, JWT_SECRET } = require("../config/serverConfig");
+const {
+  ONLINE_EXAM_API_URL,
+  JWT_SECRET,
+  USER_ID,
+  USER_EMAIL,
+  SCHOOL_ID,
+} = require("../config/serverConfig");
 const jwt = require("jsonwebtoken");
 const redisService = require("./redisService");
 
@@ -8,12 +14,25 @@ class OnlineExamService {
     this.apiUrl = apiUrl || ONLINE_EXAM_API_URL;
   }
 
-  async sendPostRequest(authorizationParams, urlPath, body = {}) {
+  async sendPostRequest(
+    authorizationParams,
+    urlPath,
+    body = {},
+    useProxyHeaders = false
+  ) {
     const response = await fetch(`${this.apiUrl}${urlPath}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${this.generateAuthToken(authorizationParams)}`,
+        Authorization: `Bearer ${this.generateAuthToken(
+          useProxyHeaders
+            ? {
+                id: USER_ID,
+                schoolId: SCHOOL_ID,
+                email: USER_EMAIL,
+              }
+            : authorizationParams
+        )}`,
       },
       body: JSON.stringify(body),
     });
@@ -50,9 +69,13 @@ class OnlineExamService {
 
   async fetchExamStudents(testId) {
     try {
-      const response = await this.sendPostRequest({}, "api/exams/students", {
-        testId,
-      });
+      const response = await this.sendPostRequest(
+        {},
+        "api/v1/proxy-server/students",
+        {
+          testId,
+        }
+      );
 
       return response;
     } catch (error) {
@@ -100,13 +123,17 @@ class OnlineExamService {
       let attempts = 0;
       while (attempts < 3) {
         try {
+          const useProxyHeaders = request.useProxyHeaders;
+
           delete request.headers.Authorization.exp;
           delete request.headers.Authorization.iat;
+          delete request.useProxyHeaders;
 
           const response = await this.sendPostRequest(
             request.headers.Authorization,
             request.uri,
-            request.body
+            request.body,
+            useProxyHeaders
           );
           console.log(
             `✅ Successfully replayed request to ${request.uri}:`,

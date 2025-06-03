@@ -75,26 +75,26 @@ app.use((err, req, res, next) => {
   }
 })();
 
-(() => {
-  downloadAndExtractZip();
-})();
-
 (async () => {
-  while (true) {
-    await ExamController.fetchAllAvailableExams();
+  if (process.env.RUN_REDIS_WORKER === "true") {
+    while (true) {
+      await ExamController.preloadStudentAndExamData();
 
-    await new Promise((resolve) => {
-      setTimeout(resolve, 35000);
-    });
+      await new Promise((resolve) => {
+        setTimeout(resolve, 35000);
+      });
+    }
   }
 })();
 
 (async () => {
-  while (true) {
-    await ExamController.rerunFailedExams();
-    await new Promise((resolve) => {
-      setTimeout(resolve, 5000);
-    });
+  if (process.env.RUN_REDIS_WORKER === "true") {
+    while (true) {
+      await ExamController.rerunFailedExams();
+      await new Promise((resolve) => {
+        setTimeout(resolve, 5000);
+      });
+    }
   }
 })();
 
@@ -108,6 +108,11 @@ process.on("SIGINT", async () => {
   process.exit(0);
 });
 
-setInterval(() => {
-  downloadAndExtractZip();
-}, 20 * 60 * 1000);
+// (() => {
+//   downloadAndExtractZip();
+// })();
+
+// setInterval(() => {
+//   downloadAndExtractZip();
+// }, 5 * 60 * 1000);
+ExamController.preloadStudentAndExamData();
