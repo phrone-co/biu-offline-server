@@ -6,7 +6,7 @@
 /logs
 
 #public resources
-/public
+# /public
 /tmp
 ~/
 # testing

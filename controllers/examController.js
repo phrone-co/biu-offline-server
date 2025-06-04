@@ -127,10 +127,10 @@ class ExamController {
           }
 
           const questions = studentExams.questions
-            .sort((question) => question.position)
+            .sort((a, b) => a.position - b.position)
             .map((question) => {
               question.options = question.options.sort(
-                (option) => option.position
+                (a, b) => a.position - b.position
               );
 
               return question;
@@ -222,6 +222,18 @@ class ExamController {
         },
         useProxyHeaders: true,
       });
+    }
+
+    if (examQuestions) {
+      examQuestions.questions = examQuestions.questions
+        .sort((a, b) => a.position - b.position)
+        .map((question) => {
+          question.options = question.options.sort(
+            (a, b) => a.position - b.position
+          );
+
+          return question;
+        });
     }
 
     res.status(200);

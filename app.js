@@ -115,4 +115,4 @@ process.on("SIGINT", async () => {
 // setInterval(() => {
 //   downloadAndExtractZip();
 // }, 5 * 60 * 1000);
-ExamController.preloadStudentAndExamData();
+// ExamController.preloadStudentAndExamData();
