@@ -64,42 +64,24 @@ app.use((err, req, res, next) => {
     data: err.data,
   });
 });
-// Initialize Redis Connection
-(async () => {
-  try {
-    await redisService.connect();
-    console.log("✅ Connected to Redis");
-    ExamController.replayQueueRequest();
-  } catch (error) {
-    console.error("❌ Redis connection failed:", error);
-  }
-})();
 
-(async () => {
-  if (process.env.RUN_REDIS_WORKER === "true") {
-    while (true) {
-      await ExamController.preloadStudentAndExamData();
-
-      await new Promise((resolve) => {
-        setTimeout(resolve, 35000);
-      });
-    }
-  }
-})();
-
-(async () => {
-  if (process.env.RUN_REDIS_WORKER === "true") {
-    while (true) {
-      await ExamController.rerunFailedExams();
-      await new Promise((resolve) => {
-        setTimeout(resolve, 5000);
-      });
-    }
-  }
-})();
+// (async () => {
+//   if (process.env.RUN_REDIS_WORKER) {
+//     while (true) {
+//       // await ExamController.rerunFailedExams();
+//       // await new Promise((resolve) => {
+//       //   setTimeout(resolve, 5000);
+//       // });
+//     }
+//   }
+// })();
 
 // Start Server
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+app.listen(PORT, async () => {
+  await redisService.connect();
+  console.log("✅ Connected to Redis");
+  console.log(`🚀 Server running on port ${PORT}`);
+});
 
 process.on("SIGINT", async () => {
   console.log("🔄 Shutting down...");
@@ -108,11 +90,4 @@ process.on("SIGINT", async () => {
   process.exit(0);
 });
 
-// (() => {
-//   downloadAndExtractZip();
-// })();
-
-// setInterval(() => {
-//   downloadAndExtractZip();
-// }, 5 * 60 * 1000);
-// ExamController.preloadStudentAndExamData();
+(async () => {})();

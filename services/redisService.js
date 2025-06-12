@@ -94,7 +94,9 @@ class RedisService {
 
   async fetchStudentExamState(studentId) {
     try {
-      const state = await redisClient.get(`student_exam_state:${studentId}`);
+      const state = await redisClient.get(
+        `student_exam_state_new:${studentId}`
+      );
       return state ? JSON.parse(state) : null;
     } catch (error) {
       console.error(
@@ -108,7 +110,7 @@ class RedisService {
   async updateStudentExamState(studentId, state) {
     try {
       await redisClient.set(
-        `student_exam_state:${studentId}`,
+        `student_exam_state_new:${studentId}`,
         JSON.stringify(state)
       );
       console.log(`Updated exam state for student ${studentId}`);
@@ -123,7 +125,7 @@ class RedisService {
   async addStudent(studentId, studentData) {
     try {
       await redisClient.hSet(
-        `students`,
+        `studentsss-new`,
         studentId,
         JSON.stringify(studentData)
       );
@@ -135,7 +137,7 @@ class RedisService {
 
   async fetchStudent(studentId) {
     try {
-      const studentData = await redisClient.hGet(`students`, studentId);
+      const studentData = await redisClient.hGet(`studentsss-new`, studentId);
       return studentData ? JSON.parse(studentData) : null;
     } catch (error) {
       console.error(`Error fetching student ${studentId}:`, error);
@@ -146,7 +148,7 @@ class RedisService {
   async addStudentLogin(matricNumber, studentData) {
     try {
       await redisClient.hSet(
-        `students-login`,
+        `student-login-new`,
         matricNumber,
         JSON.stringify(studentData)
       );
@@ -159,7 +161,7 @@ class RedisService {
   async fetchStudentLogin(matricNumber) {
     try {
       const studentData = await redisClient.hGet(
-        `students-login`,
+        `student-login-new`,
         matricNumber
       );
       return studentData ? JSON.parse(studentData) : null;
@@ -172,7 +174,7 @@ class RedisService {
   async addStudentExamAttempt(studentId, examId, examQuestions) {
     try {
       await redisClient.hSet(
-        `students-exams`,
+        `student-exams-new`,
         `${studentId}-${examId}`,
         JSON.stringify(examQuestions)
       );
@@ -185,7 +187,7 @@ class RedisService {
   async fetchStudentExamAttempt(studentId, examId) {
     try {
       const studentData = await redisClient.hGet(
-        `students-exams`,
+        `student-exams-new`,
         `${studentId}-${examId}`
       );
 
@@ -197,6 +199,32 @@ class RedisService {
     } catch (error) {
       console.error(`Error fetching student ${studentId} ${examId}:`, error);
       return null;
+    }
+  }
+
+  async fetchAllStudentAttempts() {
+    try {
+      const allAttempts = await redisClient.hGetAll(`student-exams-new`);
+
+      const parsedAttempts = {};
+      for (const key in allAttempts) {
+        if (Object.prototype.hasOwnProperty.call(allAttempts, key)) {
+          try {
+            parsedAttempts[key] = JSON.parse(allAttempts[key]);
+          } catch (parseError) {
+            console.error(
+              `Error parsing attempt data for student ${key}:`,
+              parseError
+            );
+            parsedAttempts[key] = allAttempts[key]; // Store raw if parsing fails
+          }
+        }
+      }
+      console.log("Fetched all student exam attempts.");
+      return parsedAttempts;
+    } catch (error) {
+      console.error("Error fetching all student attempts:", error);
+      return {};
     }
   }
 }

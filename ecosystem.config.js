@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: "biu-proxy-server",
+      name: "app",
       script: "app.js",
       instances: "max",
       exec_mode: "cluster",
@@ -10,12 +10,21 @@ module.exports = {
       },
     },
     {
-      name: "biu-redis-worker",
-      script: "app.js",
+      name: "background-jobs",
+      script: "background-jobs.js",
       instances: 1,
+      exec_mode: "fork",
       env: {
         NODE_ENV: "production",
-        RUN_REDIS_WORKER: "true",
+      },
+    },
+    {
+      name: "load-questions",
+      script: "load-questions.js",
+      instances: 1,
+      exec_mode: "fork",
+      env: {
+        NODE_ENV: "production",
       },
     },
   ],

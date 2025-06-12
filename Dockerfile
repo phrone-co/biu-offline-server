@@ -1,25 +1,24 @@
-# Use official Node.js 20 image
 FROM node:20-slim
 
-# Set the working directory inside the container
 WORKDIR /app
 
-# Copy package.json and package-lock.json first for better caching
 COPY package*.json ./
 
-# Install dependencies globally and locally
-RUN npm install -g pm2 && npm install --production
+RUN npm install -g pm2 && npm install --omit=dev
 
-# Copy the rest of the application files
+COPY ecosystem.config.js ./
+
 COPY . .
-
+# Copy production environment variables
 RUN cp .env.production .env
 
 # Expose the port your app runs on (adjust if needed)
+COPY . .
+
 EXPOSE 3000
 
-# Start the app using PM2 in production mode
-CMD ["pm2-runtime", "start", "ecosystem.config.js"]
+CMD ["pm2-runtime", "ecosystem.config.js", "--env", "production", "--no-daemon"]
+
 
 
 # 🔹 Stage 1: Build & Minify Code

@@ -18,7 +18,8 @@ class OnlineExamService {
     authorizationParams,
     urlPath,
     body = {},
-    useProxyHeaders = false
+    useProxyHeaders = false,
+    proxyHeaderData = {}
   ) {
     const response = await fetch(`${this.apiUrl}${urlPath}`, {
       method: "POST",
@@ -30,6 +31,7 @@ class OnlineExamService {
                 id: USER_ID,
                 schoolId: SCHOOL_ID,
                 email: USER_EMAIL,
+                ...proxyHeaderData,
               }
             : authorizationParams
         )}`,
@@ -37,7 +39,7 @@ class OnlineExamService {
       body: JSON.stringify(body),
     });
 
-    console.log("response::: ", response);
+    // console.log("response::: ", response);
 
     // if (!response.ok) {
     //   throw new Error(`Server responded with ${response.status}`);
@@ -124,6 +126,7 @@ class OnlineExamService {
       while (attempts < 3) {
         try {
           const useProxyHeaders = request.useProxyHeaders;
+          const proxyHeaderData = request.proxyHeaderData;
 
           delete request.headers.Authorization.exp;
           delete request.headers.Authorization.iat;
@@ -133,7 +136,8 @@ class OnlineExamService {
             request.headers.Authorization,
             request.uri,
             request.body,
-            useProxyHeaders
+            useProxyHeaders,
+            proxyHeaderData
           );
           console.log(
             `✅ Successfully replayed request to ${request.uri}:`,

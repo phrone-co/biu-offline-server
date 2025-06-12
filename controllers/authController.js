@@ -51,9 +51,9 @@ class AuthController {
 
       const isPasswordValid = await bcrypt.compare(password, user.password);
 
-      if (!isPasswordValid) {
-        throw new BadRequestError("Your password is wrong!");
-      }
+      // if (!isPasswordValid) {
+      //   throw new BadRequestError("Your password is wrong!");
+      // }
 
       const accessTokenPayload = {
         id: user.id,

@@ -4,6 +4,7 @@ const onlineExamServices = require("../services/onlineExamServices");
 const redisService = require("../services/redisService");
 const httpRequest = require("../utils/httpRequest");
 const { DateTime } = require("luxon");
+const _ = require("lodash");
 
 class ExamController {
   static storeAuthHeaders(req) {
@@ -89,12 +90,24 @@ class ExamController {
   }
 
   static async preloadStudentAndExamData(req, res) {
+    console.log("loading students");
     const allStudents = await newOnlineExamServices.fetchAllStudents();
+
+    console.log(
+      "loading students",
+      allStudents.map((email) => email)
+    );
 
     // for each student, fetch their exams
     const studentsExams = {};
 
     for (let student of allStudents) {
+      // if (student.id !== "2ada7cbb-39de-4a26-b3e5-aa92188b73c6") {
+      //   continue;
+      // }
+
+      console.log("loading exams:", student.email);
+
       const exams = await newOnlineExamServices.fetchStudentExams(
         student.id,
         student.email
@@ -146,6 +159,7 @@ class ExamController {
             ...exam,
           });
         } catch (error) {
+          console.log("error::: ", error);
           await redisService.enqueue("failed-students-exam", {
             studentId: student.id,
             studentEmail: student.email,
@@ -211,7 +225,7 @@ class ExamController {
         examQuestions
       );
 
-      await redisService.enqueue("requestlog5", {
+      await redisService.enqueue("requestlognew20250606a", {
         uri: `api/v1/exams/${examId}/mark-start-date`,
         method: "POST",
         headers: ExamController.storeAuthHeaders(req),
@@ -221,6 +235,10 @@ class ExamController {
           schoolId: SCHOOL_ID,
         },
         useProxyHeaders: true,
+        proxyHeaderData: {
+          id: studentId,
+          email: req.session.email,
+        },
       });
     }
 
@@ -258,7 +276,7 @@ class ExamController {
       seen: true,
     };
 
-    await redisService.enqueue("requestlog5", {
+    await redisService.enqueue("requestlognew20250606a", {
       uri: `api/v1/exams/${examId}/questions/${questionId}/mark-as-seen`,
       method: "POST",
       headers: ExamController.storeAuthHeaders(req),
@@ -268,6 +286,10 @@ class ExamController {
         schoolId: SCHOOL_ID,
       },
       useProxyHeaders: true,
+      proxyHeaderData: {
+        id: studentId,
+        email: req.session.email,
+      },
     });
 
     await redisService.addStudentExamAttempt(studentId, examId, examQuestions);
@@ -281,7 +303,7 @@ class ExamController {
     const questionId = req.params.questionId;
     const studentId = req.session.id;
 
-    await redisService.enqueue("requestlog5", {
+    await redisService.enqueue("requestlognew20250606a", {
       uri: `api/v1/exams/${examId}/time-up`,
       method: "POST",
       headers: ExamController.storeAuthHeaders(req),
@@ -289,6 +311,10 @@ class ExamController {
         schoolId: SCHOOL_ID,
       },
       useProxyHeaders: true,
+      proxyHeaderData: {
+        id: studentId,
+        email: req.session.email,
+      },
     });
 
     const exam = await redisService.fetchStudentExamAttempt(studentId, examId);
@@ -311,7 +337,7 @@ class ExamController {
     const answerPosition = req.body.answerPosition;
     const answerText = req.body.answerText;
 
-    await redisService.enqueue("requestlog5", {
+    await redisService.enqueue("requestlognew20250606a", {
       uri: `api/v1/exams/${examId}/questions/${questionId}/answer`,
       method: "POST",
       headers: ExamController.storeAuthHeaders(req),
@@ -321,6 +347,10 @@ class ExamController {
         studentAnswer: answerText || req.body.answer,
       },
       useProxyHeaders: true,
+      proxyHeaderData: {
+        id: studentId,
+        email: req.session.email,
+      },
     });
 
     const examQuestions = await redisService.fetchStudentExamAttempt(
@@ -364,7 +394,7 @@ class ExamController {
     const examId = req.params.examId;
     const studentId = req.session.id;
 
-    await redisService.enqueue("requestlog5", {
+    await redisService.enqueue("requestlognew20250606a", {
       uri: `api/v1/exams/${examId}/complete`,
       method: "POST",
       headers: ExamController.storeAuthHeaders(req),
@@ -373,6 +403,10 @@ class ExamController {
         submittedAt: new Date(),
       },
       useProxyHeaders: true,
+      proxyHeaderData: {
+        id: studentId,
+        email: req.session.email,
+      },
     });
 
     const exam = await redisService.fetchStudentExamAttempt(studentId, examId);
@@ -386,7 +420,154 @@ class ExamController {
   }
 
   static async replayQueueRequest() {
-    await onlineExamServices.replayQueuedRequests("requestlog5");
+    await onlineExamServices.replayQueuedRequests("requestlognew20250606a");
+  }
+
+  static async uploadAllIds(allIds, allAttempts, index) {
+    for (let idIndex in allIds) {
+      const id = allIds[idIndex];
+
+      console.log(`${idIndex} of ${allIds.length} in index ${index}`);
+      const parts = id.split("-");
+      const studentId = parts.slice(0, 5).join("-");
+      const examId = parts.slice(5).join("-");
+
+      // if (
+      //   examId !== "bc7c2c40-02bc-482b-abe6-2ddaa5a5c2b4" &&
+      //   studentId !== "0f5ee90c-9648-44b2-85ff-3b9b39ddf3bb"
+      // ) {
+      //   continue;
+      // }
+
+      if (!studentId || !examId) {
+        continue;
+      }
+
+      // console.log("studentId::: ", studentId, id);
+      const { student } = (await redisService.fetchStudent(studentId)) || {};
+
+      if (!student) {
+        continue;
+      }
+
+      const attempt = allAttempts[id];
+
+      const questions = attempt.questions;
+
+      for (let question of questions) {
+        const { id: questionId, options } = question;
+
+        if (question.type === "FREE_TEXT") {
+          continue;
+        }
+
+        for (let option of options) {
+          const { id: optionId, selected } = option;
+
+          const request = {
+            uri: `api/v1/exams/${examId}/questions/${questionId}/answer`,
+            method: "POST",
+            headers: {},
+            body: {
+              optionId,
+              schoolId: SCHOOL_ID,
+              studentAnswer: selected,
+            },
+            useProxyHeaders: true,
+            proxyHeaderData: {
+              id: studentId,
+              email: student.email,
+            },
+          };
+
+          // console.log(student.email, question.id, option.id, selected);
+
+          const response = await onlineExamServices.sendPostRequest(
+            request.headers.Authorization,
+            request.uri,
+            request.body,
+            request.useProxyHeaders,
+            request.proxyHeaderData
+          );
+          // console.log(
+          //   `✅ Successfully replayed request to ${request.uri}:`,
+          //   response
+          // );
+
+          if (selected !== null && question.type === "SINGLE_ANSWER") {
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  static async uploadAllAttemptsToServer() {
+    const allAttempts = await redisService.fetchAllStudentAttempts();
+
+    const chunkedArray = _.chunk(
+      Object.keys(allAttempts).filter((attempt) => attempt.length > 20),
+      10
+    );
+
+    const allIds = Object.keys(allAttempts).filter(
+      (attempt) => attempt.length > 20
+    );
+
+    const asyncIds = _.chunk(allIds, 20);
+
+    await Promise.all(
+      asyncIds.map((ids, index) =>
+        ExamController.uploadAllIds(ids, allAttempts, index)
+      )
+    );
+
+    // let chunkUploaded = 1;
+
+    // for (let attemptIds of chunkedArray) {
+    //   const attempts = attemptIds.map((attemptId) => ({
+    //     attemptId,
+    //     attempt: allAttempts[attemptId],
+    //   }));
+
+    //   // console.log(attempts);
+
+    //   console.log("chunkUploaded::: ", chunkUploaded, attempts.length);
+    //   // await httpRequest("api/v1/attempts", "POST", {
+    //   //   attempts,
+    //   // });
+    //   ++chunkUploaded;
+    // }
+
+    console.log("uploaded");
+  }
+
+  static async increaseTime(studentEmail, amountOfTime) {
+    const examId = "698af95d-ace1-49be-8983-bcac12b387a2";
+
+    const student = await redisService.fetchStudentLogin(studentEmail);
+
+    if (!student) {
+      console.log("Student not found: ", studentEmail);
+      return;
+    }
+
+    const studentExamAttempt = await redisService.fetchStudentExamAttempt(
+      student.id,
+      examId
+    );
+
+    studentExamAttempt.isFinished = false;
+    studentExamAttempt.endDatetime = DateTime.now().plus({
+      seconds: amountOfTime * 60,
+    });
+
+    await redisService.addStudentExamAttempt(
+      student.id,
+      examId,
+
+      studentExamAttempt
+    );
   }
 }
 
