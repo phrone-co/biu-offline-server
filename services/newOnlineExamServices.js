@@ -48,9 +48,9 @@ class NewOnlineExamService {
       },
     });
 
-    // if (!response.ok) {
-    //   throw new Error(`Server responded with ${response.status}`);
-    // }
+    if (!response.ok) {
+      throw new Error(`Server responded with ${response.status}`);
+    }
 
     const contentType = response.headers.get("content-type");
 

@@ -93,10 +93,11 @@ class ExamController {
     console.log("loading students");
     const allStudents = await newOnlineExamServices.fetchAllStudents();
 
-    console.log(
-      "loading students",
-      allStudents.map((email) => email)
-    );
+    if (!allStudents) {
+      return;
+    }
+
+    console.log("loading students", allStudents);
 
     // for each student, fetch their exams
     const studentsExams = {};
@@ -190,13 +191,19 @@ class ExamController {
         req.headers
       );
 
+      if (!response.ok && response.status !== 401) {
+        throw new Error("Failed student exams");
+      }
+
       res.status(response.status);
       res.json(await response.json());
     } catch (error) {
       const examState = await redisService.fetchStudent(req.session.id);
 
       res.status(200);
-      res.json(examState.exams.map(({ questions, ...otherData }) => otherData));
+      res.json(
+        examState?.exams.map(({ questions, ...otherData }) => otherData) || []
+      );
     }
   }
 
