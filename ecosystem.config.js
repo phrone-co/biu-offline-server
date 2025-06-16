@@ -27,5 +27,14 @@ module.exports = {
         NODE_ENV: "production",
       },
     },
+    // {
+    //   name: "data-export",
+    //   script: "export-all-data.js",
+    //   instances: 1,
+    //   exec_mode: "fork",
+    //   env: {
+    //     NODE_ENV: "production",
+    //   },
+    // },
   ],
 };
